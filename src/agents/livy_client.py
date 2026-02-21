@@ -29,7 +29,14 @@ class KnoxLivyClient:
         executor_memory: str = "4g",
         executor_cores: int = 2,
         num_executors: int = 4,
-        queue: str = "root.datalake"
+        queue: str = "root.datalake",
+        proxy_user: str = None,
+        heartbeat_timeout_in_second: int = 0,
+        conf: Dict[str, Any] = None,
+        archives: List[str] = None,
+        files: List[str] = None,
+        jars: List[str] = None,
+        py_files: List[str] = None
     ):
         self.knox_host = knox_host
         self.ad_user = ad_user
@@ -43,6 +50,13 @@ class KnoxLivyClient:
         self.executor_cores = executor_cores
         self.num_executors = num_executors
         self.queue = queue
+        self.proxy_user = proxy_user or ad_user
+        self.heartbeat_timeout_in_second = heartbeat_timeout_in_second
+        self.conf = conf or {}
+        self.archives = archives or []
+        self.files = files or []
+        self.jars = jars or []
+        self.py_files = py_files or []
         
         self.session_id = None
         self.auth = (ad_user, ad_password)
@@ -59,14 +73,27 @@ class KnoxLivyClient:
         
         payload = {
             "kind": kind,
-            "proxyUser": self.ad_user,
+            "proxyUser": self.proxy_user,
             "driverMemory": self.driver_memory,
             "driverCores": self.driver_cores,
             "executorMemory": self.executor_memory,
             "executorCores": self.executor_cores,
             "numExecutors": self.num_executors,
-            "queue": self.queue
+            "queue": self.queue,
+            "heartbeatTimeoutInSecond": self.heartbeat_timeout_in_second
         }
+        
+        # Ajouter les paramètres optionnels s'ils sont fournis
+        if self.conf:
+            payload["conf"] = self.conf
+        if self.archives:
+            payload["archives"] = self.archives
+        if self.files:
+            payload["files"] = self.files
+        if self.jars:
+            payload["jars"] = self.jars
+        if self.py_files:
+            payload["pyFiles"] = self.py_files
         
         logger.info(f"Payload: {json.dumps(payload, indent=2)}")
         

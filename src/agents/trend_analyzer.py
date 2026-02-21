@@ -187,9 +187,15 @@ class TrendAnalyzerTool(BaseTool):
         ref_rows = reference_data.get("data", [])
         
         if not target_rows or not ref_rows:
+            missing = []
+            if not target_rows:
+                missing.append("table cible à la date spécifiée")
+            if not ref_rows:
+                missing.append("table de référence")
+            error_msg = f"Données manquantes: aucune donnée pour {' et '.join(missing)}. Vérifiez que la table contient des enregistrements pour ces dates."
             return {
                 "success": False,
-                "error": "Pas de données à comparer"
+                "error": error_msg
             }
         
         # Comparer toutes les métriques numériques
@@ -487,27 +493,30 @@ Pensée: {agent_scratchpad}"""
 # FONCTION PRINCIPALE
 # ============================================
 
-def analyze_trend(user_prompt: str) -> Dict[str, Any]:
+def analyze_trend(user_prompt: str, spark_config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Fonction principale pour analyser les tendances
     
     Args:
         user_prompt: Prompt utilisateur (ex: "Analyse table=splio.active date=20260127" 
                      ou '{"table_name": "splio.active", "target_date": "20260127"}')
+        spark_config: Configuration Spark optionnelle (driverMemory, cores, etc.)
     
     Returns:
         Résultats de l'analyse avec recommandations
     """
     
     agent = create_trend_analysis_agent()
+    spark_config = spark_config or {}
     
     try:
         # Parser le prompt pour extraire les paramètres directs
         logger.info(f"Analyse du prompt: {user_prompt[:100]}")
+        if spark_config:
+            logger.info(f"Config Spark: {spark_config}")
         
         table_name = None
         target_date = None
-        
         # Essayer de parser comme JSON d'abord
         try:
             if user_prompt.strip().startswith('{'):
@@ -535,7 +544,7 @@ def analyze_trend(user_prompt: str) -> Dict[str, Any]:
         # Si on a les paramètres, exécuter directement
         if table_name and target_date:
             logger.info(f"Exécution directe: table={table_name}, date={target_date}")
-            return execute_direct_analysis(table_name, target_date)
+            return execute_direct_analysis(table_name, target_date, spark_config)
         
         # Sinon utiliser l'agent
         logger.info("Format non reconnu, utilisation de l'agent")
@@ -552,12 +561,13 @@ def analyze_trend(user_prompt: str) -> Dict[str, Any]:
         }
 
 
-def execute_direct_analysis(table_name: str, target_date: str) -> Dict[str, Any]:
+def execute_direct_analysis(table_name: str, target_date: str, spark_config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Exécute l'analyse directement sans passer par l'agent
     
     Basé sur le workflow du script bash livy_v2.sh
     """
+    spark_config = spark_config or {}
     logger.info(f"Exécution directe: {table_name} / {target_date}")
     
     try:
@@ -570,19 +580,33 @@ def execute_direct_analysis(table_name: str, target_date: str) -> Dict[str, Any]
         
         logger.info("✓ Requêtes générées")
         
-        # 2. Initialiser le client Livy
+        # 2. Initialiser le client Livy avec la config fournie ou les valeurs par défaut
         from .livy_client import KnoxLivyClient
-        livy = KnoxLivyClient(
-            knox_host=Config.KNOX_HOST,
-            ad_user=Config.AD_USER,
-            ad_password=Config.AD_PASSWORD,
-            driver_memory=Config.DRIVER_MEMORY,
-            driver_cores=Config.DRIVER_CORES,
-            executor_memory=Config.EXECUTOR_MEMORY,
-            executor_cores=Config.EXECUTOR_CORES,
-            num_executors=Config.NUM_EXECUTORS,
-            queue=Config.QUEUE
-        )
+        
+        # Préparer la config Livy en mélangeant les valeurs par défaut et la config fournie
+        livy_config = {
+            'knox_host': Config.KNOX_HOST,
+            'ad_user': Config.AD_USER,
+            'ad_password': Config.AD_PASSWORD,
+            'driver_memory': spark_config.get('driverMemory', Config.DRIVER_MEMORY),
+            'driver_cores': spark_config.get('driverCores', Config.DRIVER_CORES),
+            'executor_memory': spark_config.get('executorMemory', Config.EXECUTOR_MEMORY),
+            'executor_cores': spark_config.get('executorCores', Config.EXECUTOR_CORES),
+            'num_executors': spark_config.get('numExecutors', Config.NUM_EXECUTORS),
+            'queue': spark_config.get('queue', Config.QUEUE),
+            'proxy_user': spark_config.get('proxyUser'),
+            'heartbeat_timeout_in_second': spark_config.get('heartbeatTimeoutInSecond', 0),
+            'conf': spark_config.get('conf'),
+            'archives': spark_config.get('archives'),
+            'files': spark_config.get('files'),
+            'jars': spark_config.get('jars'),
+            'py_files': spark_config.get('pyFiles')
+        }
+        
+        # Retirer les valeurs None pour éviter de les passer
+        livy_config = {k: v for k, v in livy_config.items() if v is not None}
+        
+        livy = KnoxLivyClient(**livy_config)
         
         # 3. Créer la session Livy (attends idle)
         session_id = livy.create_session()

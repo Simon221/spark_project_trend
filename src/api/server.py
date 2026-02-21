@@ -103,16 +103,18 @@ class JobManager:
             jobs_storage[job_id].update(kwargs)
     
     @staticmethod
-    def execute_analysis_async(job_id: str, prompt: str):
+    def execute_analysis_async(job_id: str, prompt: str, spark_config: Dict[str, Any] = None):
         """Exécuter l'analyse en arrière-plan"""
         try:
             JobManager.update_job(job_id, status="processing")
             db_service.save_job(job_id, "processing", prompt=prompt)
             logger.info(f"🚀 Analyse en cours pour job {job_id}")
             logger.info(f"📝 Prompt reçu: {prompt}")
+            if spark_config:
+                logger.info(f"⚙️  Config Spark: {spark_config}")
             
             try:
-                result = analyze_trend(prompt)
+                result = analyze_trend(prompt, spark_config=spark_config or {})
                 logger.info(f"✓ Résultat reçu: {type(result)}")
                 logger.info(f"  Success: {result.get('success')}")
                 logger.info(f"  Keys: {list(result.keys())}")
@@ -589,7 +591,7 @@ async def analyze_v1(request: TrendAnalysisV1Request):
         logger.info(f"Analyse créée: {job_id} - {prompt}")
         
         # Lancer l'analyse en arrière-plan
-        thread = Thread(target=JobManager.execute_analysis_async, args=(job_id, prompt))
+        thread = Thread(target=JobManager.execute_analysis_async, args=(job_id, prompt, request.spark_config))
         thread.daemon = True
         thread.start()
         
@@ -708,7 +710,7 @@ async def get_job_results_html(job_id: str):
             </body>
             </html>
             """
-        elif status == "completed":
+        elif status == "succès":
             result = job.get("result", {})
             
             if isinstance(result, dict) and result.get("success"):
@@ -1128,17 +1130,92 @@ async def get_job_results_html(job_id: str):
                 </html>
                 """
         else:
+            # Cas d'un statut inconnu ou inattendu
             html_content = f"""
             <html>
             <head><title>Analyse {job_id}</title>
-            <style>body {{ font-family: Arial; margin: 20px; }}</style>
+            <meta charset="UTF-8">
+            <style>
+                body {{ 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
+                    min-height: 100vh;
+                }}
+                .container {{
+                    max-width: 800px;
+                    margin: 0 auto;
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    overflow: hidden;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                h1 {{ margin: 0; font-size: 28px; }}
+                .content {{
+                    padding: 30px;
+                }}
+                .info-box {{
+                    background: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                    padding: 15px;
+                    margin: 15px 0;
+                    border-radius: 4px;
+                }}
+                .footer {{
+                    padding: 20px 30px;
+                    background: #f9f9f9;
+                    border-top: 1px solid #ddd;
+                    text-align: center;
+                }}
+                a {{
+                    color: #ffa500;
+                    text-decoration: none;
+                    margin: 0 10px;
+                    font-weight: 600;
+                }}
+                a:hover {{
+                    text-decoration: underline;
+                }}
+            </style>
             </head>
             <body>
-            <h1>Analyse Spark Trend</h1>
-            <p><strong>Job ID:</strong> {job_id}</p>
-            <p><strong>Status:</strong> {status}</p>
-            <p><strong>Erreur:</strong> {job.get('error', 'Statut inconnu')}</p>
-            <p><a href="/api/v1/jobs">← Retour à la liste</a></p>
+            <div class="container">
+                <div class="header">
+                    <h1>⚠️ Analyse Indisponible</h1>
+                </div>
+                <div class="content">
+                    <div class="info-box">
+                        <p><strong>Job ID:</strong> {job_id}</p>
+                        <p><strong>Statut:</strong> {status}</p>
+                    </div>
+                    
+                    <h3>Informations du Job</h3>
+                    <p><strong>Prompt:</strong> {job.get('prompt', 'N/A')}</p>
+                    <p><strong>Créé à:</strong> {job.get('created_at', 'N/A')}</p>
+                    <p><strong>Mis à jour à:</strong> {job.get('updated_at', 'N/A')}</p>
+                    
+                    {f'<p><strong>Erreur:</strong> {job.get("error", "Statut inconnu")}</p>' if job.get('error') else '<p><em>Aucune erreur enregistrée</em></p>'}
+                    
+                    <h3>Que faire?</h3>
+                    <ul>
+                        <li>Vérifiez que le nom de la table est correct (ex: splio.active)</li>
+                        <li>Assurez-vous que la date existe dans la table (format: YYYYMMDD)</li>
+                        <li>Vérifiez que la table contient des données pour cette date</li>
+                        <li>Consultez les logs du serveur pour plus de détails</li>
+                    </ul>
+                </div>
+                <div class="footer">
+                    <a href="/api/v1/jobs">← Retour à la liste des analyses</a>
+                    <a href="/api/v1/jobs/{job_id}/results">↻ Actualiser</a>
+                </div>
+            </div>
             </body>
             </html>
             """
