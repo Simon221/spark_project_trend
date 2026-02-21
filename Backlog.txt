@@ -1,6 +1,6 @@
-Lancer job sans IA
-Lancer analyses sans IA
-Creation rapport sans IA
+Lancer job sans IA : OK
+Lancer analyses sans IA : OK
+Creation rapport sans I : OK
 Possibilité de lancer rattrapage sans IA (avec jar)
 Changer page rapport - mettre plus joli
 
