@@ -37,7 +37,7 @@ def main():
         host="0.0.0.0",
         port=8000,
         reload=False,
-        log_level="debug"
+        log_level="info"
     )
 
 

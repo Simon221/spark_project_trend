@@ -1,0 +1,17 @@
+Lancer job sans IA
+Lancer analyses sans IA
+Creation rapport sans IA
+Possibilité de lancer rattrapage sans IA
+Changer page rapport - mettre plus joli
+Lancer job en utilisant l'agent IA
+Lancer analyses avec IA
+Creation rapport avec IA
+Possibilité de lancer avec sans IA
+Integrer le cache avec redis
+Integrer les metadatas avec PostgreSQL
+Integrer la sauvegarde de l'historique sur PostgreSQL
+Integrer l'authentifaction 
+    - login mot de passe
+    - puis AD
+Creer une page gestion utilisateurs
+Creer l'envoie d'alerte par email
