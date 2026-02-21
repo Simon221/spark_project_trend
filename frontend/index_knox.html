@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Trend Analyzer - Orange Sonatel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+        .loading { 
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #f97316;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Détecter automatiquement l'URL de base de l'API
+        const getApiBaseUrl = () => {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const port = window.location.port ? ':' + window.location.port : '';
+            return `${protocol}//${hostname}${port}`;
+        };
+        
+        const API_BASE_URL = getApiBaseUrl();
+
+        const SparkTrendAnalyzer = () => {
+            const [prompt, setPrompt] = useState('');
+            const [jobs, setJobs] = useState([]);
+            const [selectedJob, setSelectedJob] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [showConfig, setShowConfig] = useState(false);
+            const [autoRecovery, setAutoRecovery] = useState(true);
+            
+            // Configuration Spark
+            const [sparkConfig, setSparkConfig] = useState({
+                driverMemory: '4g',
+                driverCores: 2,
+                executorMemory: '4g',
+                executorCores: 2,
+                numExecutors: 4,
+                queue: 'root.datalake'
+            });
+
+            useEffect(() => {
+                fetchJobs();
+                const interval = setInterval(fetchJobs, 5000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const fetchJobs = async () => {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/jobs?limit=20`);
+                    const data = await response.json();
+                    setJobs(data);
+                } catch (error) {
+                    console.error('Erreur:', error);
+                }
+            };
+
+            const createAnalysis = async () => {
+                if (!prompt.trim()) return;
+                
+                setLoading(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: prompt,
+                            auto_recovery: autoRecovery,
+                            spark_config: sparkConfig
+                        })
+                    });
+                    
+                    await response.json();
+                    setPrompt('');
+                    fetchJobs();
+                } catch (error) {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors de la création de l\'analyse');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const executeRecovery = async (jobId, actionIndex) => {
+                try {
+                    await fetch(`${API_BASE_URL}/api/v1/recovery/${jobId}/execute`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            action_index: actionIndex,
+                            spark_config: sparkConfig
+                        })
+                    });
+                    alert('Rattrapage lancé !');
+                    fetchJobs();
+                } catch (error) {
+                    alert('Erreur lors du rattrapage');
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Header */}
+                    <header className="gradient-bg text-white shadow-lg">
+                        <div className="container mx-auto px-6 py-8">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                                        <i className="fas fa-chart-line text-3xl"></i>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-3xl font-bold">Spark Trend Analyzer</h1>
+                                        <p className="text-white/80 mt-1">Analyse de tendances BigData - Orange Sonatel</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                                        <i className="fas fa-shield-alt mr-2"></i>
+                                        Knox Gateway
+                                    </div>
+                                    <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                                        <i className="fas fa-robot mr-2"></i>
+                                        GPT-4o
+                                    </div>
+                                    <button
+                                        onClick={() => setShowConfig(!showConfig)}
+                                        className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg hover:bg-white/30 transition"
+                                    >
+                                        <i className="fas fa-cog mr-2"></i>
+                                        Config Spark
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="container mx-auto px-6 py-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Panel Principal */}
+                            <div className="lg:col-span-2 space-y-6">
+                                {/* Zone de saisie */}
+                                <div className="bg-white rounded-xl shadow-sm p-6">
+                                    <h2 className="text-2xl font-semibold mb-4 text-gray-800">
+                                        <i className="fas fa-search mr-2 text-orange-500"></i>
+                                        Posez votre question
+                                    </h2>
+                                    
+                                    <textarea
+                                        value={prompt}
+                                        onChange={(e) => setPrompt(e.target.value)}
+                                        placeholder="Ex: Analyse table=splio.active date=20260127"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                        rows="4"
+                                    />
+
+                                    <div className="flex items-center justify-between mt-4 mb-6">
+                                        <label className="flex items-center space-x-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={autoRecovery}
+                                                onChange={(e) => setAutoRecovery(e.target.checked)}
+                                                className="w-4 h-4 text-orange-600 border-gray-300 rounded"
+                                            />
+                                            <span className="text-sm text-gray-700">
+                                                <i className="fas fa-sync-alt mr-1"></i>
+                                                Rattrapage automatique
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <button
+                                        onClick={createAnalysis}
+                                        disabled={loading || !prompt.trim()}
+                                        className="w-full bg-gradient-to-r from-orange-600 to-orange-700 text-white py-3 px-6 rounded-lg font-medium hover:from-orange-700 hover:to-orange-800 transition-all disabled:opacity-50 shadow-lg"
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <i className="fas fa-spinner fa-spin mr-2"></i>
+                                                Analyse en cours...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i className="fas fa-paper-plane mr-2"></i>
+                                                Lancer l'analyse
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {/* Exemples */}
+                                    <div className="mt-6 pt-6 border-t border-gray-200">
+                                        <h3 className="text-sm font-medium text-gray-700 mb-3">
+                                            <i className="fas fa-lightbulb mr-2 text-yellow-500"></i>
+                                            Exemples
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {[
+                                                "Analyse table=splio.active date=20260127",
+                                                "Analyse table=splio.users date=20260127"
+                                            ].map((ex, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => setPrompt(ex)}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg"
+                                                >
+                                                    → {ex}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Historique */}
+                                <div className="bg-white rounded-xl shadow-sm p-6">
+                                    <h2 className="text-xl font-semibold mb-4 text-gray-800">
+                                        <i className="fas fa-history mr-2 text-orange-500"></i>
+                                        Historique ({jobs.length})
+                                    </h2>
+                                    
+                                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        {jobs.map((job) => (
+                                            <div
+                                                key={job.job_id}
+                                                onClick={() => setSelectedJob(job)}
+                                                className="p-4 border border-gray-200 rounded-lg hover:border-orange-500 cursor-pointer transition"
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <p className="text-sm text-gray-800 font-medium flex-1">{job.prompt}</p>
+                                                    <span className={`text-xs px-2 py-1 rounded ${
+                                                        job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                                        job.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                                        job.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                    }`}>
+                                                        {job.status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-2">
+                                                    {new Date(job.created_at).toLocaleString('fr-FR')}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sidebar */}
+                            <div className="space-y-6">
+                                {/* Configuration Spark */}
+                                {showConfig && (
+                                    <div className="bg-white rounded-xl shadow-sm p-6">
+                                        <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                                            <i className="fas fa-sliders-h mr-2 text-orange-500"></i>
+                                            Configuration Spark
+                                        </h3>
+                                        
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Driver Memory</label>
+                                                <input
+                                                    type="text"
+                                                    value={sparkConfig.driverMemory}
+                                                    onChange={(e) => setSparkConfig({...sparkConfig, driverMemory: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Driver Cores</label>
+                                                <input
+                                                    type="number"
+                                                    value={sparkConfig.driverCores}
+                                                    onChange={(e) => setSparkConfig({...sparkConfig, driverCores: parseInt(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Executor Memory</label>
+                                                <input
+                                                    type="text"
+                                                    value={sparkConfig.executorMemory}
+                                                    onChange={(e) => setSparkConfig({...sparkConfig, executorMemory: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Executor Cores</label>
+                                                <input
+                                                    type="number"
+                                                    value={sparkConfig.executorCores}
+                                                    onChange={(e) => setSparkConfig({...sparkConfig, executorCores: parseInt(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Num Executors</label>
+                                                <input
+                                                    type="number"
+                                                    value={sparkConfig.numExecutors}
+                                                    onChange={(e) => setSparkConfig({...sparkConfig, numExecutors: parseInt(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Queue</label>
+                                                <input
+                                                    type="text"
+                                                    value={sparkConfig.queue}
+                                                    onChange={(e) => setSparkConfig({...sparkConfig, queue: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Détails du job sélectionné */}
+                                <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6">
+                                    <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                                        <i className="fas fa-info-circle mr-2 text-orange-500"></i>
+                                        Détails
+                                    </h3>
+                                    
+                                    {selectedJob ? (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-600">Status</p>
+                                                <p className="text-sm text-gray-800 mt-1">{selectedJob.status}</p>
+                                            </div>
+                                            
+                                            {selectedJob.result && (
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-600 mb-2">Résultats</p>
+                                                    <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto max-h-96">
+                                                        {JSON.stringify(selectedJob.result, null, 2)}
+                                                    </pre>
+                                                </div>
+                                            )}
+
+                                            {selectedJob.result?.actions && (
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-600 mb-2">Actions de rattrapage</p>
+                                                    {selectedJob.result.actions.map((action, idx) => (
+                                                        <div key={idx} className="mb-3 p-3 bg-orange-50 rounded-lg">
+                                                            <p className="text-sm font-medium text-orange-900">{action.action}</p>
+                                                            <p className="text-xs text-orange-700 mt-1">{action.details}</p>
+                                                            <button
+                                                                onClick={() => executeRecovery(selectedJob.job_id, idx)}
+                                                                className="mt-2 text-xs bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700"
+                                                            >
+                                                                <i className="fas fa-play mr-1"></i>
+                                                                Exécuter
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <i className="fas fa-hand-pointer text-4xl text-gray-300 mb-3"></i>
+                                            <p className="text-sm text-gray-500">Sélectionnez une analyse</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<SparkTrendAnalyzer />, document.getElementById('root'));
+    </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# PostgreSQL
+docker run -d \
+  --name spark-trend-postgres \
+  -e POSTGRES_USER=simon \
+  -e POSTGRES_PASSWORD=passer123 \
+  -e POSTGRES_DB=trends \
+  -p 5432:5432 \
+  postgres:16-alpine
+
+# Redis
+docker run -d \
+  --name spark-trend-redis \
+  -p 6379:6379 \
+  redis:7

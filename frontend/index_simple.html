@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Trend Analyzer - Orange Sonatel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #f97316;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pending { background: #fee2e2; color: #991b1b; }
+        .status-running { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #dcfce7; color: #166534; }
+        .status-error { background: #fecaca; color: #7f1d1d; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script>
+        // Détecter l'URL de base de l'API
+        const API_BASE_URL = (() => {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const port = window.location.port ? ':' + window.location.port : '';
+            return `${protocol}//${hostname}${port}`;
+        })();
+
+        console.log('API Base URL:', API_BASE_URL);
+
+        // Application principale
+        class SparkTrendApp {
+            constructor() {
+                this.appContainer = document.getElementById('app');
+                this.jobs = [];
+                this.selectedJobId = null;
+                this.loading = false;
+                this.init();
+            }
+
+            async init() {
+                this.render();
+                await this.fetchJobs();
+                // Refresh jobs toutes les 5 secondes
+                setInterval(() => this.fetchJobs(), 5000);
+            }
+
+            async fetchJobs() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/jobs?limit=20`);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    this.jobs = await response.json();
+                    this.render();
+                } catch (error) {
+                    console.error('Erreur fetchJobs:', error);
+                }
+            }
+
+            async createAnalysis(prompt) {
+                if (!prompt.trim()) return;
+                this.loading = true;
+                this.render();
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt })
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    await response.json();
+                    document.querySelector('textarea')?.focus();
+                    document.querySelector('textarea').value = '';
+                    await this.fetchJobs();
+                } catch (error) {
+                    console.error('Erreur createAnalysis:', error);
+                    alert('❌ Erreur: ' + error.message);
+                } finally {
+                    this.loading = false;
+                    this.render();
+                }
+            }
+
+            async selectJob(jobId) {
+                this.selectedJobId = jobId;
+                this.render();
+            }
+
+            getStatusClass(status) {
+                switch(status) {
+                    case 'pending': return 'status-pending';
+                    case 'running': return 'status-running';
+                    case 'completed': return 'status-completed';
+                    case 'error': return 'status-error';
+                    default: return 'status-pending';
+                }
+            }
+
+            formatDate(dateStr) {
+                try {
+                    return new Date(dateStr).toLocaleString('fr-FR');
+                } catch {
+                    return dateStr;
+                }
+            }
+
+            render() {
+                const selectedJob = this.jobs.find(j => j.job_id === this.selectedJobId);
+                
+                this.appContainer.innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <!-- HEADER -->
+                        <header class="gradient-bg text-white shadow-lg">
+                            <div class="container mx-auto px-6 py-8">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                                            <i class="fas fa-chart-line text-3xl"></i>
+                                        </div>
+                                        <div>
+                                            <h1 class="text-3xl font-bold">Spark Trend Analyzer</h1>
+                                            <p class="text-white/80 mt-1">Analyse de tendances BigData - Orange Sonatel</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right text-sm">
+                                        <p class="text-white/80">API: ${API_BASE_URL}</p>
+                                        <p class="text-white/60">Jobs: ${this.jobs.length}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div class="container mx-auto px-6 py-8">
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <!-- PANEL PRINCIPAL -->
+                                <div class="lg:col-span-2 space-y-6">
+                                    <!-- FORMULAIRE -->
+                                    <div class="bg-white rounded-xl shadow-sm p-6">
+                                        <h2 class="text-2xl font-semibold mb-4 text-gray-800">
+                                            <i class="fas fa-search mr-2 text-orange-500"></i>
+                                            Posez votre question
+                                        </h2>
+                                        
+                                        <div class="space-y-4">
+                                            <textarea 
+                                                id="prompt-input"
+                                                placeholder="Ex: Vérifie les tendances de splio.users pour le 20260127"
+                                                class="w-full h-24 p-4 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none resize-none"
+                                                ${this.loading ? 'disabled' : ''}
+                                            ></textarea>
+                                            
+                                            <div class="flex gap-2">
+                                                <button 
+                                                    onclick="app.createAnalysis(document.getElementById('prompt-input').value)"
+                                                    ${this.loading ? 'disabled' : ''}
+                                                    class="flex-1 bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                                                >
+                                                    ${this.loading ? '<span class="spinner" style="display:inline-block; width:20px; height:20px; border-width:2px;"></span> Analyse en cours...' : '<i class="fas fa-play mr-2"></i>Lancer l\'analyse'}
+                                                </button>
+                                            </div>
+
+                                            <div class="text-sm text-gray-600">
+                                                <p class="font-semibold mb-2">Exemples:</p>
+                                                <ul class="space-y-1">
+                                                    <li>• Vérifie les tendances de splio.users pour le 20260127</li>
+                                                    <li>• Compare splio.active du 20260127 avec les 7 derniers jours</li>
+                                                    <li>• Analyse le nombre d'utilisateurs actifs et les emails uniques</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- LISTE DES JOBS -->
+                                    <div class="bg-white rounded-xl shadow-sm p-6">
+                                        <h2 class="text-2xl font-semibold mb-4 text-gray-800">
+                                            <i class="fas fa-history mr-2 text-orange-500"></i>
+                                            Analyses récentes (${this.jobs.length})
+                                        </h2>
+                                        
+                                        ${this.jobs.length === 0 ? 
+                                            '<p class="text-gray-500">Aucune analyse pour le moment</p>' 
+                                            : 
+                                            '<div class="space-y-2">' +
+                                            this.jobs.map(job => `
+                                                <div 
+                                                    onclick="app.selectJob('${job.job_id}')"
+                                                    class="p-4 border-2 ${this.selectedJobId === job.job_id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-gray-300'} rounded-lg cursor-pointer transition"
+                                                >
+                                                    <div class="flex justify-between items-start">
+                                                        <div class="flex-1">
+                                                            <p class="font-semibold text-gray-800 truncate">${job.prompt || 'Sans titre'}</p>
+                                                            <p class="text-sm text-gray-500 mt-1">${this.formatDate(job.created_at)}</p>
+                                                        </div>
+                                                        <span class="status-badge ${this.getStatusClass(job.status)}">
+                                                            ${job.status === 'running' ? '<i class="fas fa-spinner fa-spin mr-1"></i>' : ''}
+                                                            ${job.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            `).join('') +
+                                            '</div>'
+                                        }
+                                    </div>
+                                </div>
+
+                                <!-- PANEL DÉTAILS -->
+                                <div class="bg-white rounded-xl shadow-sm p-6">
+                                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">
+                                        <i class="fas fa-info-circle mr-2 text-orange-500"></i>
+                                        Détails
+                                    </h2>
+                                    
+                                    ${selectedJob ? this.renderJobDetails(selectedJob) : '<p class="text-gray-500">Sélectionnez une analyse</p>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderJobDetails(job) {
+                const result = job.result || {};
+                const analysis = result.analysis || {};
+                
+                return `
+                    <div class="space-y-4">
+                        <div class="text-sm">
+                            <p class="text-gray-600">Job ID</p>
+                            <p class="font-mono text-xs bg-gray-100 p-2 rounded break-all">${job.job_id}</p>
+                        </div>
+                        
+                        <div class="text-sm">
+                            <p class="text-gray-600">Statut</p>
+                            <p class="mt-1"><span class="status-badge ${this.getStatusClass(job.status)}">${job.status}</span></p>
+                        </div>
+                        
+                        ${result.success ? `
+                            <div class="text-sm">
+                                <p class="text-gray-600">Table</p>
+                                <p class="font-semibold">${result.table_name || 'N/A'}</p>
+                            </div>
+                            
+                            <div class="text-sm">
+                                <p class="text-gray-600">Date</p>
+                                <p class="font-semibold">${result.target_date || 'N/A'}</p>
+                            </div>
+                            
+                            ${analysis.verdict ? `
+                                <div class="text-sm">
+                                    <p class="text-gray-600">Verdict</p>
+                                    <p class="text-lg font-bold mt-1">
+                                        <span style="color: ${
+                                            analysis.verdict === 'negative' ? 'red' :
+                                            analysis.verdict === 'warning' ? 'orange' :
+                                            analysis.verdict === 'positive' ? 'green' : 'blue'
+                                        }">
+                                            ${analysis.verdict.toUpperCase()}
+                                        </span>
+                                    </p>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="mt-4">
+                                <a href="${API_BASE_URL}/api/v1/jobs/${job.job_id}/results" target="_blank" class="text-orange-500 hover:text-orange-600 font-semibold flex items-center">
+                                    <i class="fas fa-external-link-alt mr-2"></i>
+                                    Voir le rapport complet
+                                </a>
+                            </div>
+                        ` : ''}
+                        
+                        ${job.error ? `
+                            <div class="mt-4 p-3 bg-red-100 border border-red-300 rounded text-red-800 text-sm">
+                                <i class="fas fa-exclamation-circle mr-2"></i>
+                                ${job.error}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+        }
+
+        // Initialiser l'app
+        const app = new SparkTrendApp();
+    </script>
+</body>
+</html>

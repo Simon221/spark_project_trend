@@ -1,0 +1,211 @@
+INFO:     Started server process [97563]
+INFO:     Waiting for application startup.
+2026-02-21 02:32:20 - src.api.server - INFO - API en cours de démarrage...
+2026-02-21 02:32:20 - src.api.server - INFO - API en cours de démarrage...
+2026-02-21 02:32:20 - src.api.server - INFO - LLM Model: gpt-4o
+2026-02-21 02:32:20 - src.api.server - INFO - LLM Model: gpt-4o
+2026-02-21 02:32:20 - src.api.server - INFO - Knox Host: mespmasterprd3.orange-sonatel.com:8443
+2026-02-21 02:32:20 - src.api.server - INFO - Knox Host: mespmasterprd3.orange-sonatel.com:8443
+2026-02-21 02:32:20 - src.api.server - INFO - API prête à recevoir les requêtes
+2026-02-21 02:32:20 - src.api.server - INFO - API prête à recevoir les requêtes
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:55733 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:32:24 - src.api.server - INFO - Prompt brut reçu: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - Prompt brut reçu: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - ✓ Parsé comme texte: table=splio.active, date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - ✓ Parsé comme texte: table=splio.active, date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - Prompt final: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - Prompt final: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - Analyse créée: 429692a0-a1ee-41a6-b8f7-e1ce3119d295 - Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - Analyse créée: 429692a0-a1ee-41a6-b8f7-e1ce3119d295 - Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - 🚀 Analyse en cours pour job 429692a0-a1ee-41a6-b8f7-e1ce3119d295
+INFO:     127.0.0.1:55748 - "POST /api/v1/analyze HTTP/1.1" 200 OK
+2026-02-21 02:32:24 - src.api.server - INFO - 🚀 Analyse en cours pour job 429692a0-a1ee-41a6-b8f7-e1ce3119d295
+2026-02-21 02:32:24 - src.api.server - INFO - 📝 Prompt reçu: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.api.server - INFO - 📝 Prompt reçu: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - Analyse du prompt: Analyse table=splio.active date=20260122
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - ✓ Parsé comme texte: table=splio.active, date=20260122
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - Exécution directe: table=splio.active, date=20260122
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - Exécution directe: splio.active / 20260122
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - Génération requêtes: table=splio.active, target=20260122
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - Requête cible: SELECT 
+    '20260122' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTIN...
+2026-02-21 02:32:24 - src.agents.trend_analyzer - INFO - ✓ Requêtes générées
+2026-02-21 02:32:24 - src.agents.livy_client - INFO - === Création de la session Spark ===
+2026-02-21 02:32:24 - src.agents.livy_client - INFO - Base URL: https://mespmasterprd3.orange-sonatel.com:8443/gateway/cdp-proxy-api/livy/v1
+2026-02-21 02:32:24 - src.agents.livy_client - INFO - User: sddesigner
+2026-02-21 02:32:24 - src.agents.livy_client - INFO - Payload: {
+  "kind": "spark",
+  "proxyUser": "sddesigner",
+  "driverMemory": "4g",
+  "driverCores": 2,
+  "executorMemory": "4g",
+  "executorCores": 2,
+  "numExecutors": 4,
+  "queue": "root.datalake"
+}
+2026-02-21 02:32:24 - src.agents.livy_client - INFO - POST à https://mespmasterprd3.orange-sonatel.com:8443/gateway/cdp-proxy-api/livy/v1/sessions
+INFO:     127.0.0.1:55755 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:32:29 - src.agents.livy_client - INFO - Status HTTP: 201
+2026-02-21 02:32:29 - src.agents.livy_client - INFO - Réponse brute: {"id":32,"name":null,"appId":null,"owner":"sddesigner","state":"starting","kind":"spark","appInfo":{"driverLogUrl":null,"sparkUiUrl":null,"executorLogUrls":null},"log":["stdout: ","","\u001B[0;31m7.1.9 and 7.2.17 are the last CDP runtime releases where Spark 2 is supported.","\nstderr: ","\nYARN Diagnostics: "],"ttl":null,"driverMemory":"4g","driverCores":2,"executorMemory":"4g","executorCores":2,"conf":{},"archives":[],"files":[],"heartbeatTimeoutInSecond":0,"jars":[],"numExecutors":4,"proxyUser":"sddesigner","pyFiles":[],"queue":"root.datalake"}
+2026-02-21 02:32:29 - src.agents.livy_client - INFO - Réponse JSON: {
+  "id": 32,
+  "name": null,
+  "appId": null,
+  "owner": "sddesigner",
+  "state": "starting",
+  "kind": "spark",
+  "appInfo": {
+    "driverLogUrl": null,
+    "sparkUiUrl": null,
+    "executorLogUrls": null
+  },
+  "log": [
+    "stdout: ",
+    "",
+    "\u001b[0;31m7.1.9 and 7.2.17 are the last CDP runtime releases where Spark 2 is supported.",
+    "\nstderr: ",
+    "\nYARN Diagnostics: "
+  ],
+  "ttl": null,
+  "driverMemory": "4g",
+  "driverCores": 2,
+  "executorMemory": "4g",
+  "executorCores": 2,
+  "conf": {},
+  "archives": [],
+  "files": [],
+  "heartbeatTimeoutInSecond": 0,
+  "jars": [],
+  "numExecutors": 4,
+  "proxyUser": "sddesigner",
+  "pyFiles": [],
+  "queue": "root.datalake"
+}
+2026-02-21 02:32:29 - src.agents.livy_client - INFO - ✓ Session créée: 32
+2026-02-21 02:32:29 - src.agents.livy_client - INFO - Attente de la session (timeout: 120s)...
+INFO:     127.0.0.1:55755 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:32:31 - src.agents.livy_client - INFO -   [3s] État session 32: starting
+INFO:     127.0.0.1:55790 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:32:39 - src.agents.livy_client - INFO -   [11s] État session 32: starting
+INFO:     127.0.0.1:55790 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55790 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:32:47 - src.agents.livy_client - INFO -   [19s] État session 32: starting
+INFO:     127.0.0.1:55790 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:32:55 - src.agents.livy_client - INFO -   [27s] État session 32: starting
+INFO:     127.0.0.1:55790 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55913 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:04 - src.agents.livy_client - INFO -   [35s] État session 32: idle
+2026-02-21 02:33:04 - src.agents.livy_client - INFO - ✓ Session idle! Attente supplémentaire de 2s pour être sûr...
+INFO:     127.0.0.1:55913 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:10 - src.agents.livy_client - INFO - ✓ Session validée! État final: idle
+2026-02-21 02:33:10 - src.agents.trend_analyzer - INFO - ✓ Session créée: 32
+2026-02-21 02:33:10 - src.agents.livy_client - INFO - === Exécution SQL avec session 32 ===
+2026-02-21 02:33:10 - src.agents.livy_client - INFO - Requête originale (first 200 chars): SELECT 
+    '20260122' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)
+FROM splio.active
+WHERE day = '20260122'...
+2026-02-21 02:33:10 - src.agents.livy_client - INFO - Requête complète: SELECT 
+    '20260122' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)
+FROM splio.active
+WHERE day = '20260122'
+INFO:     127.0.0.1:55913 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:13 - src.agents.livy_client - INFO - État session avant statement: idle
+2026-02-21 02:33:13 - src.agents.livy_client - INFO - Code Scala à exécuter:
+spark.sql("""SELECT 
+    '20260122' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)
+FROM splio.active
+WHERE day = '20260122'""").toJSON().collect()
+2026-02-21 02:33:13 - src.agents.livy_client - INFO - POST à https://mespmasterprd3.orange-sonatel.com:8443/gateway/cdp-proxy-api/livy/v1/sessions/32/statements
+INFO:     127.0.0.1:55913 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:16 - src.agents.livy_client - INFO - Status HTTP: 201
+2026-02-21 02:33:16 - src.agents.livy_client - INFO - Réponse brute: {"id":0,"code":"spark.sql(\"\"\"SELECT \n    '20260122' as date,\n    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)\nFROM splio.active\nWHERE day = '20260122'\"\"\").toJSON().collect()","state":"waiting","output":null,"progress":0.0,"started":0,"completed":0}
+2026-02-21 02:33:16 - src.agents.livy_client - INFO - Réponse JSON parsée: {
+  "id": 0,
+  "code": "spark.sql(\"\"\"SELECT \n    '20260122' as date,\n    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)\nFROM splio.active\nWHERE day = '20260122'\"\"\").toJSON().collect()",
+  "state": "waiting",
+  "output": null,
+  "progress": 0.0,
+  "started": 0,
+  "completed": 0
+}
+2026-02-21 02:33:16 - src.agents.livy_client - INFO - ✓ Statement soumis: ID=0
+2026-02-21 02:33:16 - src.agents.livy_client - INFO - Attente des résultats...
+2026-02-21 02:33:18 - src.agents.livy_client - INFO -   État statement: available
+2026-02-21 02:33:18 - src.agents.livy_client - INFO - ✓ Statement terminé!
+2026-02-21 02:33:18 - src.agents.livy_client - ERROR - ❌ Erreur output status non-ok: <console>:28: error: not enough arguments for method apply: (colName: String)org.apache.spark.sql.Column in class Dataset.
+2026-02-21 02:33:18 - src.agents.trend_analyzer - INFO - ✓ Requête cible exécutée: 0 lignes
+2026-02-21 02:33:18 - src.agents.livy_client - INFO - === Exécution SQL avec session 32 ===
+2026-02-21 02:33:18 - src.agents.livy_client - INFO - Requête originale (first 200 chars): SELECT 
+    '20260115' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)
+FROM splio.active
+WHERE day = '20260115'...
+2026-02-21 02:33:18 - src.agents.livy_client - INFO - Requête complète: SELECT 
+    '20260115' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)
+FROM splio.active
+WHERE day = '20260115'
+INFO:     127.0.0.1:56007 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:21 - src.agents.livy_client - INFO - État session avant statement: idle
+2026-02-21 02:33:21 - src.agents.livy_client - INFO - Code Scala à exécuter:
+spark.sql("""SELECT 
+    '20260115' as date,
+    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)
+FROM splio.active
+WHERE day = '20260115'""").toJSON().collect()
+2026-02-21 02:33:21 - src.agents.livy_client - INFO - POST à https://mespmasterprd3.orange-sonatel.com:8443/gateway/cdp-proxy-api/livy/v1/sessions/32/statements
+2026-02-21 02:33:25 - src.agents.livy_client - INFO - Status HTTP: 201
+2026-02-21 02:33:25 - src.agents.livy_client - INFO - Réponse brute: {"id":1,"code":"spark.sql(\"\"\"SELECT \n    '20260115' as date,\n    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)\nFROM splio.active\nWHERE day = '20260115'\"\"\").toJSON().collect()","state":"waiting","output":null,"progress":0.0,"started":0,"completed":0}
+2026-02-21 02:33:25 - src.agents.livy_client - INFO - Réponse JSON parsée: {
+  "id": 1,
+  "code": "spark.sql(\"\"\"SELECT \n    '20260115' as date,\n    COUNT(msisdn), sum(top_active), COUNT(DISTINCT email)\nFROM splio.active\nWHERE day = '20260115'\"\"\").toJSON().collect()",
+  "state": "waiting",
+  "output": null,
+  "progress": 0.0,
+  "started": 0,
+  "completed": 0
+}
+2026-02-21 02:33:25 - src.agents.livy_client - INFO - ✓ Statement soumis: ID=1
+2026-02-21 02:33:25 - src.agents.livy_client - INFO - Attente des résultats...
+INFO:     127.0.0.1:56007 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:27 - src.agents.livy_client - INFO -   État statement: available
+2026-02-21 02:33:27 - src.agents.livy_client - INFO - ✓ Statement terminé!
+2026-02-21 02:33:27 - src.agents.livy_client - ERROR - ❌ Erreur output status non-ok: <console>:28: error: not enough arguments for method apply: (colName: String)org.apache.spark.sql.Column in class Dataset.
+2026-02-21 02:33:27 - src.agents.trend_analyzer - INFO - ✓ Requête référence exécutée: 0 lignes
+2026-02-21 02:33:27 - src.agents.trend_analyzer - INFO - ✓ Analyse complétée: verdict=None
+2026-02-21 02:33:27 - src.agents.livy_client - INFO - Fermeture session 32...
+INFO:     127.0.0.1:56007 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+2026-02-21 02:33:31 - src.agents.livy_client - INFO - ✓ Session fermée
+2026-02-21 02:33:31 - src.agents.trend_analyzer - INFO - ✓ Session fermée
+2026-02-21 02:33:31 - src.api.server - INFO - ✓ Résultat reçu: <class 'dict'>
+2026-02-21 02:33:31 - src.api.server - INFO - ✓ Résultat reçu: <class 'dict'>
+2026-02-21 02:33:31 - src.api.server - INFO -   Success: True
+2026-02-21 02:33:31 - src.api.server - INFO -   Success: True
+2026-02-21 02:33:31 - src.api.server - INFO -   Keys: ['success', 'table_name', 'target_date', 'queries', 'analysis']
+2026-02-21 02:33:31 - src.api.server - INFO -   Keys: ['success', 'table_name', 'target_date', 'queries', 'analysis']
+2026-02-21 02:33:31 - src.api.server - INFO - ✅ Analyse succès pour job 429692a0-a1ee-41a6-b8f7-e1ce3119d295
+2026-02-21 02:33:31 - src.api.server - INFO - ✅ Analyse succès pour job 429692a0-a1ee-41a6-b8f7-e1ce3119d295
+2026-02-21 02:33:31 - src.api.server - INFO - 💾 Analyse terminée et sauvegardée pour job 429692a0-a1ee-41a6-b8f7-e1ce3119d295
+2026-02-21 02:33:31 - src.api.server - INFO - 💾 Analyse terminée et sauvegardée pour job 429692a0-a1ee-41a6-b8f7-e1ce3119d295
+INFO:     127.0.0.1:56084 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56084 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56084 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56155 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-02-21 02:34:22 - src.api.server - INFO - API en cours d'arrêt...
+2026-02-21 02:34:22 - src.api.server - INFO - API en cours d'arrêt...
+INFO:     Application shutdown complete.
+INFO:     Finished server process [97563]
