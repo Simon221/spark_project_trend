@@ -590,9 +590,37 @@ def execute_direct_analysis(table_name: str, target_date: str) -> Dict[str, Any]
         
         # 4. Exécuter les requêtes cible et référence
         target_data = livy.execute_sql(queries["query_target"])
+        
+        # Vérifier si target_data contient une erreur
+        if not target_data.get("success"):
+            error_msg = target_data.get("error", "Erreur inconnue lors de l'exécution de la requête cible")
+            logger.error(f"❌ Erreur requête cible: {error_msg}")
+            livy.close_session()
+            return {
+                "success": False,
+                "table_name": table_name,
+                "target_date": target_date,
+                "error": error_msg,
+                "queries": queries
+            }
+        
         logger.info(f"✓ Requête cible exécutée: {target_data.get('count', 0)} lignes")
         
         ref_data = livy.execute_sql(queries["query_reference"])
+        
+        # Vérifier si ref_data contient une erreur
+        if not ref_data.get("success"):
+            error_msg = ref_data.get("error", "Erreur inconnue lors de l'exécution de la requête référence")
+            logger.error(f"❌ Erreur requête référence: {error_msg}")
+            livy.close_session()
+            return {
+                "success": False,
+                "table_name": table_name,
+                "target_date": target_date,
+                "error": error_msg,
+                "queries": queries
+            }
+        
         logger.info(f"✓ Requête référence exécutée: {ref_data.get('count', 0)} lignes")
         
         # 5. Analyser les tendances

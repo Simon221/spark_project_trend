@@ -44,12 +44,19 @@ from ..agents import analyze_trend
 from ..models.config import Config
 from ..utils.logger import setup_logger
 from ..utils.serializers import make_json_serializable
+from ..services.db_service import DatabaseService
 
 # ============================================
 # CONFIGURATION LOGGING
 # ============================================
 
 logger = setup_logger(__name__)
+
+# ============================================
+# DATABASE SERVICE
+# ============================================
+
+db_service = DatabaseService()
 
 # ============================================
 # JOB STORAGE (EN-MÉMOIRE)
@@ -100,6 +107,7 @@ class JobManager:
         """Exécuter l'analyse en arrière-plan"""
         try:
             JobManager.update_job(job_id, status="processing")
+            db_service.save_job(job_id, "processing", prompt=prompt)
             logger.info(f"🚀 Analyse en cours pour job {job_id}")
             logger.info(f"📝 Prompt reçu: {prompt}")
             
@@ -110,7 +118,8 @@ class JobManager:
                 logger.info(f"  Keys: {list(result.keys())}")
             except Exception as analyze_error:
                 logger.error(f"❌ Erreur lors de l'analyse: {str(analyze_error)}", exc_info=True)
-                JobManager.update_job(job_id, status="failed", error=f"Analyze error: {str(analyze_error)}")
+                JobManager.update_job(job_id, status="erreur", error=f"Analyze error: {str(analyze_error)}")
+                db_service.save_job(job_id, "erreur", result={"error": str(analyze_error)})
                 return
             
             if result.get("success"):
@@ -120,21 +129,28 @@ class JobManager:
                 serializable_result = make_json_serializable(result)
                 JobManager.update_job(
                     job_id,
-                    status="completed",
+                    status="succès",
                     result=serializable_result
                 )
+                db_service.save_job(job_id, "succès", result=serializable_result)
                 logger.info(f"💾 Analyse terminée et sauvegardée pour job {job_id}")
             else:
                 error_msg = result.get("error", "Unknown error")
                 logger.error(f"❌ Analyse échouée pour job {job_id}: {error_msg}")
+                # Rendre le résultat sérialisable avant de le stocker
+                from src.utils.serializers import make_json_serializable
+                serializable_result = make_json_serializable(result)
                 JobManager.update_job(
                     job_id,
-                    status="failed",
-                    error=error_msg
+                    status="erreur",
+                    error=error_msg,
+                    result=serializable_result
                 )
+                db_service.save_job(job_id, "erreur", result=serializable_result)
         except Exception as e:
             logger.error(f"❌ Erreur exception lors de l'analyse du job {job_id}: {str(e)}", exc_info=True)
-            JobManager.update_job(job_id, status="failed", error=str(e))
+            JobManager.update_job(job_id, status="erreur", error=str(e))
+            db_service.save_job(job_id, "erreur", result={"error": str(e)})
 
 
 # ============================================
@@ -233,9 +249,9 @@ class HealthResponse(BaseModel):
 # ENDPOINTS
 # ============================================
 
-@app.get("/", tags=["Health"])
-async def root():
-    """Endpoint racine"""
+@app.get("/api", tags=["Health"])
+async def api_root():
+    """Endpoint API racine"""
     try:
         return JSONResponse(
             status_code=200,
@@ -468,13 +484,27 @@ async def documentation():
 # ============================================
 
 @app.get("/api/v1/jobs", tags=["API v1"])
-async def get_jobs(limit: int = Query(20, ge=1, le=100)):
-    """Récupérer la liste des jobs"""
+async def get_jobs(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+    """Récupérer la liste des jobs avec pagination"""
     try:
-        jobs = JobManager.get_jobs(limit=limit)
-        # Rendre les jobs sérialisables
-        jobs_serializable = [make_json_serializable(job) for job in jobs]
-        return JSONResponse(status_code=200, content=jobs_serializable)
+        # Récupérer depuis la base de données
+        jobs, total = db_service.get_jobs_paginated(page=page, limit=limit)
+        
+        # Ajouter les infos de pagination
+        total_pages = (total + limit - 1) // limit
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "data": jobs,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total,
+                    "total_pages": total_pages
+                }
+            }
+        )
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des jobs: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
@@ -933,17 +963,167 @@ async def get_job_results_html(job_id: str):
                 </html>
                 """
             else:
-                error = result.get("error", "Erreur inconnue") if isinstance(result, dict) else str(result)
+                # Cas d'erreur
+                error_msg = result.get("error", "Erreur inconnue") if isinstance(result, dict) else str(result)
+                table_name = result.get("table_name", "N/A") if isinstance(result, dict) else "N/A"
+                target_date = result.get("target_date", "N/A") if isinstance(result, dict) else "N/A"
+                queries = result.get("queries", {}) if isinstance(result, dict) else {}
+                
+                queries_html = ""
+                if isinstance(queries, dict) and queries:
+                    queries_html = "<h3>📝 Requêtes Générées</h3>"
+                    
+                    query_target = queries.get("query_target", "")
+                    query_reference = queries.get("query_reference", "")
+                    
+                    if query_target:
+                        queries_html += """
+                        <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #2196F3;">
+                        <strong>Requête Cible:</strong>
+                        <pre style="background: white; padding: 10px; overflow-x: auto;">{}</pre>
+                        </div>
+                        """.format(query_target)
+                    
+                    if query_reference:
+                        queries_html += """
+                        <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #FF9800;">
+                        <strong>Requête Référence:</strong>
+                        <pre style="background: white; padding: 10px; overflow-x: auto;">{}</pre>
+                        </div>
+                        """.format(query_reference)
+                
                 html_content = f"""
                 <html>
                 <head><title>Erreur - {job_id}</title>
-                <style>body {{ font-family: Arial; margin: 20px; }}</style>
+                <style>
+                    body {{ 
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        margin: 0;
+                        padding: 20px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        min-height: 100vh;
+                    }}
+                    .container {{
+                        max-width: 1200px;
+                        margin: 0 auto;
+                        background: white;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                        overflow: hidden;
+                    }}
+                    .header {{
+                        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+                        color: white;
+                        padding: 30px;
+                        text-align: center;
+                    }}
+                    h1 {{ margin: 0; font-size: 28px; }}
+                    .summary {{
+                        background: #f9f9f9;
+                        padding: 20px;
+                        border-bottom: 1px solid #ddd;
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 20px;
+                    }}
+                    .summary-item {{
+                        padding: 10px;
+                    }}
+                    .summary-item strong {{
+                        display: block;
+                        color: #ff6b6b;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                        margin-bottom: 5px;
+                    }}
+                    .summary-item span {{
+                        display: block;
+                        font-size: 16px;
+                        color: #333;
+                    }}
+                    .error-box {{
+                        font-size: 16px;
+                        color: #cc0000;
+                        padding: 15px;
+                        text-align: center;
+                        background: #ffe6e6;
+                        border-left: 4px solid #cc0000;
+                        border-radius: 4px;
+                        margin: 20px 0;
+                        font-family: 'Courier New', monospace;
+                        word-break: break-all;
+                    }}
+                    .content {{
+                        padding: 30px;
+                    }}
+                    h3 {{
+                        color: #333;
+                        border-bottom: 2px solid #ff6b6b;
+                        padding-bottom: 10px;
+                        margin-top: 30px;
+                    }}
+                    pre {{
+                        background: #f5f5f5;
+                        padding: 10px;
+                        border-radius: 4px;
+                        overflow-x: auto;
+                        font-size: 12px;
+                    }}
+                    .footer {{
+                        background: #f9f9f9;
+                        padding: 20px;
+                        text-align: center;
+                        border-top: 1px solid #ddd;
+                    }}
+                    a {{
+                        color: #667eea;
+                        text-decoration: none;
+                        margin: 0 10px;
+                        font-weight: 600;
+                    }}
+                    a:hover {{ text-decoration: underline; }}
+                </style>
                 </head>
                 <body>
-                <h1>❌ Erreur lors de l'analyse</h1>
-                <p><strong>Job ID:</strong> {job_id}</p>
-                <p><strong>Erreur:</strong> {error}</p>
-                <p><a href="/api/v1/jobs">← Retour à la liste</a></p>
+                <div class="container">
+                    <div class="header">
+                        <h1>❌ Erreur lors de l'exécution</h1>
+                    </div>
+                    
+                    <div class="summary">
+                        <div class="summary-item">
+                            <strong>Job ID</strong>
+                            <span>{job_id}</span>
+                        </div>
+                        <div class="summary-item">
+                            <strong>Status</strong>
+                            <span>ERREUR</span>
+                        </div>
+                        {f'<div class="summary-item"><strong>Table</strong><span>{table_name}</span></div>' if table_name != "N/A" else ''}
+                        {f'<div class="summary-item"><strong>Date cible</strong><span>{target_date}</span></div>' if target_date != "N/A" else ''}
+                    </div>
+                    
+                    <div class="content">
+                        <div class="error-box">
+                            {error_msg}
+                        </div>
+                        
+                        {queries_html}
+                        
+                        <h3>ℹ️ Suggestions</h3>
+                        <ul>
+                            <li>Vérifiez que le nom de la table est correct (ex: splio.active)</li>
+                            <li>Assurez-vous que la date existe dans la table (format: YYYYMMDD)</li>
+                            <li>Vérifiez vos droits d'accès aux données Spark</li>
+                            <li>Consultez les logs pour plus de détails</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer">
+                        <a href="/api/v1/jobs">← Retour à la liste des analyses</a>
+                        <a href="/api/v1/jobs/{job_id}/results">↻ Actualiser</a>
+                    </div>
+                </div>
                 </body>
                 </html>
                 """
@@ -1012,6 +1192,37 @@ async def execute_recovery_v1(job_id: str, request: RecoveryExecuteRequest):
         raise
     except Exception as e:
         logger.error(f"Erreur lors du rattrapage: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+
+@app.delete("/api/v1/jobs/{job_id}", tags=["API v1"])
+async def delete_job(job_id: str):
+    """Supprimer un job de la base de données"""
+    try:
+        if not job_id or not job_id.strip():
+            raise HTTPException(status_code=400, detail="Job ID ne peut pas être vide")
+        
+        # Supprimer de la base de données
+        success = db_service.delete_job(job_id)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Erreur lors de la suppression du job")
+        
+        # Supprimer aussi de la mémoire si elle existe
+        if job_id in jobs_storage:
+            del jobs_storage[job_id]
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": f"Job {job_id} supprimé avec succès"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression du job {job_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 

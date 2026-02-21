@@ -1,6 +1,7 @@
 Lancer job sans IA : OK
 Lancer analyses sans IA : OK
 Creation rapport sans I : OK
+Afficher les erreurs dans le rapport : OK
 Possibilité de lancer rattrapage sans IA (avec jar)
 Changer page rapport - mettre plus joli
 
@@ -18,7 +19,8 @@ Possibilité de lancer avec sans IA (avec jar)
 
 Integrer le cache avec redis
 Integrer les metadatas avec PostgreSQL
-Integrer la sauvegarde de l'historique sur PostgreSQL
+Integrer la sauvegarde de l'historique sur PostgreSQL : OK
+Afficher l'historique avec pagination : OK
 
 Integrer l'authentifaction 
     - login mot de passe
