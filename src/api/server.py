@@ -670,7 +670,7 @@ async def get_job_results_html(job_id: str):
         if not job_id or not job_id.strip():
             raise HTTPException(status_code=400, detail="Job ID ne peut pas être vide")
         
-        job = JobManager.get_job(job_id)
+        job = db_service.get_job_by_id(job_id)
         
         if not job:
             raise HTTPException(status_code=404, detail="Job non trouvé")
