@@ -486,7 +486,7 @@ async def documentation():
 # ============================================
 
 @app.get("/api/v1/jobs", tags=["API v1"])
-async def get_jobs(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+async def get_jobs(page: int = Query(1, ge=1), limit: int = Query(5, ge=1, le=100)):
     """Récupérer la liste des jobs avec pagination"""
     try:
         # Récupérer depuis la base de données

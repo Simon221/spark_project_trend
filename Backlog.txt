@@ -10,7 +10,7 @@ Changer le format et
     - comparer 7 jours d'affiler et non juste le 7e jour
     - afficher une courbe de tendance
 
-Prendre en compte les configs de lancement spark : 
+Prendre en compte les configs de lancement spark : OK
 
 Lancer job en utilisant l'agent IA
 Lancer analyses avec IA
