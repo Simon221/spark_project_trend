@@ -215,7 +215,7 @@ class KnoxLivyClient:
         # Normaliser la requête en une seule ligne pour éviter les problèmes avec les newlines
         normalized_query = ' '.join(sql_query.split())
         
-        # Code Scala: utiliser .show() qui est la méthode standard Spark pour afficher les résultats
+        # Code Scala: .show() fonctionne et retourne une table ASCII formatée
         code = f'spark.sql("{normalized_query}").show()'
         
         payload = {"code": code}
@@ -348,35 +348,91 @@ class KnoxLivyClient:
                 }
             
             # Récupérer les données
-            text_plain = output.get("data", {}).get("text/plain", "[]")
+            data_obj = output.get("data", {})
+            text_plain = data_obj.get("text/plain", "[]")
             
-            logger.debug(f"Texte brut reçu: {text_plain[:200]}")
+            # LOGS DÉTAILLÉS POUR DÉBOGUER
+            logger.info(f"=== PARSE RESULTS DEBUG ===")
+            logger.info(f"Type de data_obj: {type(data_obj)}")
+            logger.info(f"Contenu data_obj: {json.dumps(data_obj, indent=2, default=str)}")
+            logger.info(f"Type de text_plain: {type(text_plain)}")
+            logger.info(f"Repr text_plain: {repr(text_plain)}")
+            logger.info(f"Longueur text_plain: {len(str(text_plain))}")
+            logger.info(f"Première 500 chars: {str(text_plain)[:500]}")
+            
+            # Convertir en string si ce n'est pas déjà une string
+            if not isinstance(text_plain, str):
+                logger.warning(f"⚠️  text_plain n'est pas une string, conversion...")
+                text_plain = str(text_plain)
             
             # Parser le JSON - gérer différents formats de réponse
             try:
-                # Format: res0: Array[String] = Array({"col1": val1, ...}, ...)
-                if isinstance(text_plain, str) and "Array(" in text_plain:
-                    # Extraire le contenu entre Array( et )
-                    start = text_plain.find("Array(") + 6
-                    end = text_plain.rfind(")")
-                    text_plain = text_plain[start:end]
+                logger.info(f"Tentative de parsing du format reçu...")
                 
-                # Si c'est au format res0 = ..., extraire la partie après =
-                if text_plain.startswith("res"):
-                    parts = text_plain.split("=", 1)
-                    if len(parts) > 1:
-                        text_plain = parts[1].strip()
+                # Format 1: Table ASCII de .show()
+                # +--------+-------------+...
+                # |    col1|       col2|...
+                # +--------+-------------+...
+                # |   val1|        val2|...
+                # +--------+-------------+...
+                if text_plain.startswith("+"):
+                    logger.info("Format détecté: Table ASCII de .show()")
+                    lines = text_plain.strip().split("\n")
+                    
+                    # Extraire les en-têtes (ligne 2)
+                    header_line = lines[1] if len(lines) > 1 else ""
+                    headers = [h.strip() for h in header_line.split("|")[1:-1]]
+                    logger.info(f"En-têtes trouvés: {headers}")
+                    
+                    # Extraire les données (lignes 3 à n-1, en sautant les séparateurs)
+                    results_list = []
+                    for i in range(3, len(lines), 2):  # Sauter les séparations (lignes +---+)
+                        if i >= len(lines) or lines[i].startswith("+"):
+                            break
+                        values = [v.strip() for v in lines[i].split("|")[1:-1]]
+                        if values:
+                            # Créer un dict avec en-têtes et valeurs
+                            row = {}
+                            for header, value in zip(headers, values):
+                                # Essayer de convertir en nombre si possible
+                                try:
+                                    if "." in value:
+                                        row[header] = float(value)
+                                    else:
+                                        row[header] = int(value)
+                                except ValueError:
+                                    row[header] = value
+                            results_list.append(row)
+                    
+                    logger.info(f"✓ Parsé {len(results_list)} lignes de table ASCII")
                 
-                logger.debug(f"Texte après nettoyage: {text_plain[:200]}")
-                
-                # Essayer de parser comme JSON array
-                if text_plain.startswith("["):
-                    # C'est un JSON array
+                # Format 2: JSON array [ ... ]
+                elif text_plain.startswith("["):
+                    logger.info("Format détecté: JSON array")
                     results_list = json.loads(text_plain)
-                else:
-                    # C'est peut-être une liste Python string
+                
+                # Format 3: JSON lines (chaque ligne est un JSON)
+                elif text_plain.startswith("{"):
+                    logger.info("Format détecté: JSON lines")
+                    lines = text_plain.strip().split("\n")
+                    results_list = []
+                    for line in lines:
+                        line = line.strip()
+                        if line:
+                            try:
+                                results_list.append(json.loads(line))
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"⚠️  Impossible de parser ligne JSON: {line[:100]}")
+                
+                # Format 4: Python tuple/list
+                elif text_plain.startswith("("):
+                    logger.info("Format détecté: Python tuple/list")
                     import ast
                     results_list = ast.literal_eval(text_plain)
+                
+                else:
+                    logger.warning(f"Format inconnu, retour du texte brut")
+                    results_list = [{"raw": text_plain}]
                 
                 # Si c'est une liste de strings JSON
                 if results_list and isinstance(results_list[0], str):
@@ -394,8 +450,10 @@ class KnoxLivyClient:
                 }
                 
             except (json.JSONDecodeError, ValueError, SyntaxError) as parse_err:
-                logger.error(f"Erreur parsing JSON/Python: {parse_err}")
-                logger.error(f"Texte tentative: {text_plain}")
+                logger.error(f"❌ Erreur parsing JSON/Python: {parse_err}")
+                logger.error(f"Type erreur: {type(parse_err)}")
+                logger.error(f"Texte tentative COMPLET:\n{text_plain}")
+                logger.error(f"Repr texte: {repr(text_plain)}")
                 
                 # Si ça échoue, retourner au moins le texte brut
                 return {
@@ -406,7 +464,7 @@ class KnoxLivyClient:
                 }
                 
         except Exception as e:
-            logger.error(f"Erreur parsing résultats: {e}", exc_info=True)
+            logger.error(f"❌ Erreur parsing résultats: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
