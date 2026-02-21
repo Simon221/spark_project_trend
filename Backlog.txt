@@ -1,15 +1,25 @@
 Lancer job sans IA
 Lancer analyses sans IA
 Creation rapport sans IA
-Possibilité de lancer rattrapage sans IA
+Possibilité de lancer rattrapage sans IA (avec jar)
 Changer page rapport - mettre plus joli
+
+
+Changer le format et 
+    - comparer 7 jours d'affiler et non juste le 7e jour
+    - afficher une courbe de tendance
+
+Prendre en compte les configs de lancement spark
+
 Lancer job en utilisant l'agent IA
 Lancer analyses avec IA
 Creation rapport avec IA
-Possibilité de lancer avec sans IA
+Possibilité de lancer avec sans IA (avec jar)
+
 Integrer le cache avec redis
 Integrer les metadatas avec PostgreSQL
 Integrer la sauvegarde de l'historique sur PostgreSQL
+
 Integrer l'authentifaction 
     - login mot de passe
     - puis AD
