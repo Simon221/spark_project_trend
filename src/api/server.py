@@ -723,14 +723,16 @@ async def get_job_results_html(job_id: str):
                 alerts = analysis.get("alerts", [])
                 recovery_plan = analysis.get("recovery_plan")
                 
-                # Couleur du verdict
-                verdict_color = {
-                    "negative": "red",
-                    "warning": "orange",
-                    "positive": "green",
-                    "stable": "blue",
-                    "neutral": "gray"
-                }.get(verdict, "gray")
+                # Couleur du verdict  
+                verdict_colors = {
+                    "negative": "#ef4444",
+                    "warning": "#f97316",
+                    "positive": "#22c55e",
+                    "stable": "#3b82f6",
+                    "neutral": "#6b7280"
+                }
+                verdict_color_hex = verdict_colors.get(verdict, "#6b7280")
+                verdict_bg_color = f"{verdict_color_hex}15"
                 
                 # Construire les requêtes SQL HTML
                 queries_html = ""
@@ -741,41 +743,42 @@ async def get_job_results_html(job_id: str):
                     query_reference = queries.get("query_reference", "")
                     
                     if query_target:
-                        queries_html += """
-                        <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #2196F3;">
-                        <strong>Requête Cible (Date: {}):</strong>
-                        <pre style="background: white; padding: 10px; overflow-x: auto;">{}</pre>
+                        queries_html += f"""
+                        <div class="query-container">
+                            <span class="query-label">Requête Cible (Date: {queries.get('target_date', '')})</span>
+                            <pre>{query_target}</pre>
                         </div>
-                        """.format(queries.get("target_date", ""), query_target)
+                        """
                     
                     if query_reference:
-                        queries_html += """
-                        <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #FF9800;">
-                        <strong>Requête Référence (Date: {}):</strong>
-                        <pre style="background: white; padding: 10px; overflow-x: auto;">{}</pre>
+                        queries_html += f"""
+                        <div class="query-container">
+                            <span class="query-label">Requête Référence (Date: {queries.get('reference_date', '')})</span>
+                            <pre>{query_reference}</pre>
                         </div>
-                        """.format(queries.get("reference_date", ""), query_reference)
+                        """
                 
                 # Construire les comparaisons HTML avec données brutes
                 comparisons_html = ""
                 if comparisons:
-                    comparisons_html = "<h3>📊 Résultats des Comparaisons</h3><table border='1' cellpadding='10' style='border-collapse: collapse; width: 100%;'>"
-                    comparisons_html += "<tr style='background-color: #f0f0f0;'><th>Métrique</th><th>Valeur Cible</th><th>Valeur Référence</th><th>Variation</th><th>Variation %</th><th>Alerte</th></tr>"
+                    comparisons_html = "<h3>📊 Résultats des Comparaisons</h3><table>"
+                    comparisons_html += "<tr><th>Métrique</th><th>Valeur Cible</th><th>Valeur Référence</th><th>Variation</th><th>Variation %</th><th>Alerte</th></tr>"
                     for comp in comparisons:
-                        alert_color = {
-                            "CRITICAL": "#ffcccc",
-                            "WARNING": "#ffe6cc",
-                            "POSITIVE": "#ccffcc",
-                            "NORMAL": "#ffffff"
-                        }.get(comp.get("alert"), "#ffffff")
+                        alert_level = comp.get("alert", "NORMAL").upper()
+                        alert_icon = {
+                            "CRITICAL": "🔴",
+                            "WARNING": "🟠",
+                            "POSITIVE": "🟢",
+                            "NORMAL": "⚪"
+                        }.get(alert_level, "⚪")
                         comparisons_html += f"""
-                        <tr style="background-color: {alert_color};">
+                        <tr>
                             <td><strong>{comp.get('metric', 'N/A')}</strong></td>
-                            <td>{comp.get('target_value', 'N/A')}</td>
-                            <td>{comp.get('reference_value', 'N/A')}</td>
-                            <td>{comp.get('variation', 'N/A'):.4f}</td>
-                            <td>{comp.get('variation_pct', 'N/A')}</td>
-                            <td style="font-weight: bold; color: {alert_color};">{comp.get('alert', 'N/A')}</td>
+                            <td>{comp.get('target_value', 'N/A'):,.0f}</td>
+                            <td>{comp.get('reference_value', 'N/A'):,.0f}</td>
+                            <td>{comp.get('variation', 0):,.0f}</td>
+                            <td><strong>{comp.get('variation_pct', 'N/A')}</strong></td>
+                            <td>{alert_icon} {alert_level}</td>
                         </tr>
                         """
                     comparisons_html += "</table>"
@@ -783,173 +786,364 @@ async def get_job_results_html(job_id: str):
                 # Construire les alertes HTML
                 alerts_html = ""
                 if alerts:
-                    alerts_html = "<h3>⚠️ Alertes Détectées</h3><ul style='font-size: 16px;'>"
+                    alerts_html = "<h3>⚠️ Alertes Détectées</h3><ul class='alert-list'>"
                     for alert in alerts:
-                        alerts_html += f"<li>{alert}</li>"
+                        alerts_html += f"<li class='alert-item'>{alert}</li>"
                     alerts_html += "</ul>"
                 
                 # Construire le plan de rattrapage HTML
                 recovery_html = ""
                 if recovery_plan and recovery_plan.get("recovery_needed"):
                     recovery_html = "<h3>🔧 Plan de Rattrapage Proposé</h3>"
+                    if recovery_plan.get("summary"):
+                        recovery_html += f"<p style='font-size: 14px; color: #555; margin-bottom: 15px;'><strong>Résumé:</strong> {recovery_plan.get('summary')}</p>"
+                    
                     for action in recovery_plan.get("actions", []):
-                        # Déterminer la couleur de la priorité
-                        priority_color = {
-                            "HIGH": "red",
-                            "MEDIUM": "orange",
-                            "LOW": "blue"
-                        }.get(action.get('priority'), "gray")
-                        
+                        priority = action.get('priority', 'MEDIUM').upper()
                         recovery_html += f"""
-                        <div style="border-left: 4px solid {priority_color}; padding: 10px; margin: 10px 0; background: #f9f9f9;">
-                            <p><strong style="color: {priority_color};">[{action.get('priority')}]</strong> <strong>{action.get('action', 'N/A')}</strong></p>
-                            <p><em>{action.get('details', '')}</em></p>
-                            <ol>
+                        <div class="recovery-action priority-{priority}">
+                            <span class="action-priority">{priority}</span>
+                            <div class="action-title">{action.get('action', 'N/A')}</div>
+                            <div class="action-details">{action.get('details', '')}</div>
+                            <div class="action-steps">
+                                <ol>
                         """
                         for step in action.get('steps', []):
                             recovery_html += f"<li>{step}</li>"
-                        recovery_html += "</ol></div>"
+                        recovery_html += """
+                                </ol>
+                            </div>
+                        </div>
+                        """
+
                 
                 html_content = f"""
                 <html>
                 <head>
                     <title>Résultats - {job_id}</title>
                     <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <style>
-                        body {{
-                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        * {{
                             margin: 0;
+                            padding: 0;
+                            box-sizing: border-box;
+                        }}
+                        body {{
+                            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                            background: linear-gradient(135deg, #f5f5f5 0%, #efefef 100%);
                             padding: 20px;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                             min-height: 100vh;
                         }}
                         .container {{
-                            max-width: 1200px;
+                            max-width: 1100px;
                             margin: 0 auto;
                             background: white;
-                            border-radius: 8px;
-                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                            border-radius: 12px;
+                            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
                             overflow: hidden;
                         }}
                         .header {{
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
                             color: white;
-                            padding: 30px;
+                            padding: 50px 30px;
                             text-align: center;
+                            border-bottom: 4px solid #D94D05;
                         }}
-                        h1 {{ margin: 0; font-size: 28px; }}
+                        .header h1 {{
+                            font-size: 32px;
+                            font-weight: 700;
+                            margin-bottom: 10px;
+                            letter-spacing: -0.5px;
+                        }}
+                        .header p {{
+                            font-size: 14px;
+                            opacity: 0.95;
+                            margin: 0;
+                        }}
                         .summary {{
-                            background: #f9f9f9;
-                            padding: 20px;
-                            border-bottom: 1px solid #ddd;
+                            background: linear-gradient(to right, #fff9f5 0%, #fffbf8 100%);
+                            padding: 30px;
+                            border-bottom: 1px solid #f0e4d8;
                             display: grid;
                             grid-template-columns: 1fr 1fr 1fr;
-                            gap: 20px;
+                            gap: 25px;
                         }}
                         .summary-item {{
-                            padding: 10px;
+                            padding: 15px;
+                            background: white;
+                            border-radius: 8px;
+                            border-left: 4px solid #F97316;
                         }}
                         .summary-item strong {{
                             display: block;
-                            color: #667eea;
-                            font-size: 12px;
+                            color: #F97316;
+                            font-size: 11px;
                             text-transform: uppercase;
-                            margin-bottom: 5px;
+                            font-weight: 700;
+                            letter-spacing: 0.5px;
+                            margin-bottom: 8px;
                         }}
                         .summary-item span {{
                             display: block;
-                            font-size: 18px;
-                            color: #333;
+                            font-size: 20px;
+                            font-weight: 600;
+                            color: #1a1a1a;
+                        }}
+                        .verdict-section {{
+                            padding: 30px;
+                            text-align: center;
+                            background: white;
+                            border-bottom: 1px solid #f0f0f0;
                         }}
                         .verdict {{
-                            font-size: 32px;
-                            font-weight: bold;
-                            color: {verdict_color};
-                            padding: 20px;
-                            text-align: center;
-                            background: #f0f0f0;
-                            border-radius: 8px;
+                            font-size: 48px;
+                            font-weight: 700;
+                            color: {verdict_color_hex};
+                            text-transform: capitalize;
+                            padding: 25px;
+                            background: {verdict_bg_color};
+                            border-radius: 12px;
+                            display: inline-block;
+                            margin-bottom: 15px;
                         }}
                         .content {{
-                            padding: 30px;
+                            padding: 35px;
                         }}
                         h3 {{
-                            color: #333;
-                            border-bottom: 2px solid #667eea;
-                            padding-bottom: 10px;
-                            margin-top: 30px;
+                            color: #1a1a1a;
+                            font-size: 18px;
+                            font-weight: 700;
+                            border-bottom: 3px solid #F97316;
+                            padding-bottom: 12px;
+                            margin-top: 35px;
+                            margin-bottom: 20px;
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                        }}
+                        h3:first-child {{
+                            margin-top: 0;
                         }}
                         table {{
                             width: 100%;
                             border-collapse: collapse;
-                            margin: 15px 0;
-                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                            margin: 20px 0;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+                            border-radius: 8px;
+                            overflow: hidden;
                         }}
                         th {{
-                            background-color: #667eea;
+                            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
                             color: white;
-                            padding: 12px;
+                            padding: 14px 16px;
                             text-align: left;
                             font-weight: 600;
+                            font-size: 13px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.3px;
                         }}
                         td {{
-                            padding: 12px;
-                            border-bottom: 1px solid #ddd;
+                            padding: 14px 16px;
+                            border-bottom: 1px solid #f0f0f0;
+                            font-size: 14px;
                         }}
-                        tr:hover {{
-                            background-color: #f5f5f5;
+                        tr {{
+                            transition: background-color 0.2s ease;
+                        }}
+                        tbody tr:hover {{
+                            background-color: #faf8f6;
+                        }}
+                        tbody tr:last-child td {{
+                            border-bottom: none;
                         }}
                         pre {{
-                            background: white;
-                            border: 1px solid #ddd;
-                            border-radius: 4px;
-                            padding: 12px;
+                            background: #f8f8f8;
+                            border: 1px solid #e0e0e0;
+                            border-radius: 6px;
+                            padding: 14px;
                             overflow-x: auto;
-                            font-family: 'Courier New', monospace;
+                            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+                            font-size: 12px;
+                            color: #333;
+                            line-height: 1.4;
+                        }}
+                        pre::-webkit-scrollbar {{
+                            height: 6px;
+                        }}
+                        pre::-webkit-scrollbar-track {{
+                            background: #f0f0f0;
+                        }}
+                        pre::-webkit-scrollbar-thumb {{
+                            background: #F97316;
+                            border-radius: 3px;
+                        }}
+                        .query-container {{
+                            background: white;
+                            border: 1px solid #e8e8e8;
+                            border-radius: 8px;
+                            padding: 16px;
+                            margin-bottom: 16px;
+                        }}
+                        .query-label {{
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: #F97316;
+                            text-transform: uppercase;
+                            margin-bottom: 10px;
+                            display: block;
+                            letter-spacing: 0.3px;
+                        }}
+                        .alert-list {{
+                            list-style: none;
+                        }}
+                        .alert-item {{
+                            padding: 12px 16px;
+                            margin-bottom: 10px;
+                            background: #fff8f5;
+                            border-left: 4px solid #F97316;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            color: #333;
+                        }}
+                        .recovery-action {{
+                            border-left: 4px solid #F97316;
+                            padding: 18px;
+                            margin-bottom: 18px;
+                            background: linear-gradient(to right, #fff9f5 0%, #fffbf8 100%);
+                            border-radius: 6px;
+                            transition: all 0.2s ease;
+                        }}
+                        .recovery-action:hover {{
+                            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1);
+                        }}
+                        .priority-HIGH {{
+                            border-left-color: #dc2626;
+                            background: linear-gradient(to right, #fef2f2 0%, #fef5f5 100%);
+                        }}
+                        .priority-MEDIUM {{
+                            border-left-color: #F97316;
+                            background: linear-gradient(to right, #fff9f5 0%, #fffbf8 100%);
+                        }}
+                        .priority-LOW {{
+                            border-left-color: #059669;
+                            background: linear-gradient(to right, #f0fdf4 0%, #f7fbf5 100%);
+                        }}
+                        .action-priority {{
+                            display: inline-block;
+                            padding: 4px 10px;
+                            border-radius: 4px;
+                            font-size: 11px;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            margin-right: 10px;
+                            letter-spacing: 0.3px;
+                        }}
+                        .priority-HIGH .action-priority {{
+                            background: #fecaca;
+                            color: #7f1d1d;
+                        }}
+                        .priority-MEDIUM .action-priority {{
+                            background: #fed7aa;
+                            color: #7c2d12;
+                        }}
+                        .priority-LOW .action-priority {{
+                            background: #bbf7d0;
+                            color: #064e3b;
+                        }}
+                        .action-title {{
+                            font-weight: 600;
+                            font-size: 15px;
+                            color: #1a1a1a;
+                            margin-bottom: 8px;
+                        }}
+                        .action-details {{
                             font-size: 13px;
+                            color: #666;
+                            margin-bottom: 10px;
+                            font-style: italic;
+                        }}
+                        .action-steps {{
+                            margin-top: 10px;
+                        }}
+                        .action-steps ol {{
+                            margin-left: 20px;
+                            font-size: 13px;
+                            color: #555;
+                            line-height: 1.6;
+                        }}
+                        .action-steps li {{
+                            margin-bottom: 6px;
                         }}
                         .footer {{
-                            padding: 20px;
+                            padding: 20px 30px;
+                            background: #f8f8f8;
+                            border-top: 1px solid #e8e8e8;
                             text-align: center;
-                            border-top: 1px solid #ddd;
-                            background: #f9f9f9;
+                            font-size: 12px;
+                            color: #888;
                         }}
-                        .footer a {{
-                            color: #667eea;
+                        .back-button {{
+                            display: inline-block;
+                            margin-top: 20px;
+                            padding: 10px 20px;
+                            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+                            color: white;
                             text-decoration: none;
-                            margin: 0 10px;
+                            border-radius: 6px;
+                            font-weight: 600;
+                            transition: transform 0.2s, box-shadow 0.2s;
                         }}
-                        .footer a:hover {{
-                            text-decoration: underline;
+                        .back-button:hover {{
+                            transform: translateY(-2px);
+                            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.3);
+                        }}
+                        @media (max-width: 768px) {{
+                            .summary {{
+                                grid-template-columns: 1fr;
+                            }}
+                            .header {{
+                                padding: 30px 20px;
+                            }}
+                            .header h1 {{
+                                font-size: 24px;
+                            }}
+                            .content {{
+                                padding: 20px;
+                            }}
+                            h3 {{
+                                font-size: 16px;
+                            }}
                         }}
                     </style>
                 </head>
                 <body>
                     <div class="container">
                         <div class="header">
-                            <h1>📈 Analyse de Tendances Spark</h1>
-                            <p>Job ID: {job_id}</p>
+                            <h1>📊 Rapport d'Analyse Spark Trend</h1>
+                            <p>Analyse de tendance pour {table_name} • {target_date}</p>
                         </div>
                         
                         <div class="summary">
                             <div class="summary-item">
-                                <strong>Table Analysée</strong>
+                                <strong>Table analysée</strong>
                                 <span>{table_name}</span>
                             </div>
                             <div class="summary-item">
-                                <strong>Date</strong>
+                                <strong>Date cible</strong>
                                 <span>{target_date}</span>
                             </div>
                             <div class="summary-item">
-                                <strong>Statut</strong>
-                                <span style="color: green;">✅ Complétée</span>
+                                <strong>Rapport généré</strong>
+                                <span>{datetime.now().strftime('%d/%m/%Y %H:%M')}</span>
                             </div>
                         </div>
                         
+                        <div class="verdict-section">
+                            <div class="verdict">{verdict}</div>
+                        </div>
+                        
                         <div class="content">
-                            <div class="verdict">🎯 Verdict: {verdict.upper()}</div>
-                            <p style="font-size: 16px; color: #555;"><strong>Recommandation:</strong> {analysis.get('recommendation', 'N/A')}</p>
-                            
                             {queries_html}
                             {alerts_html}
                             {comparisons_html}
@@ -957,8 +1151,8 @@ async def get_job_results_html(job_id: str):
                         </div>
                         
                         <div class="footer">
-                            <a href="/api/v1/jobs">← Retour à la liste des analyses</a>
-                            <a href="/api/v1/jobs/{job_id}/results">↻ Actualiser</a>
+                            <p>Rapport généré avec succès</p>
+                            <a href="javascript:window.history.back();" class="back-button">← Retour</a>
                         </div>
                     </div>
                 </body>

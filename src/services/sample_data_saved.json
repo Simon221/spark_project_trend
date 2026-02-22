@@ -1,0 +1,35 @@
+{
+    "queries": {
+        "target_date": "20260120", 
+        "query_target": "SELECT \n    '20260120' as date,\n    COUNT(msisdn), sum(top_active)\nFROM splio.active\nWHERE day = '20260120'", 
+        "reference_date": "20260113", 
+        "query_reference": "SELECT \n    '20260113' as date,\n    COUNT(msisdn), sum(top_active)\nFROM splio.active\nWHERE day = '20260113'"
+    }, 
+    "success": true, 
+    "analysis": {
+        "alerts": [], 
+        "success": true, 
+        "verdict": "stable", 
+        "comparisons": [
+            {
+                "alert": "NORMAL", 
+                "metric": "count(msisdn)", 
+                "variation": 0.0044256626823575874, 
+                "target_value": 20182415.0, 
+                "variation_pct": "0.44%", 
+                "reference_value": 20093488.0
+            }, 
+            {
+                "alert": "NORMAL",
+                "metric": "sum(top_active)", 
+                "variation": 0.0008962044313388693, 
+                "target_value": 13658670.0, 
+                "variation_pct": "0.09%", 
+                "reference_value": 13646440.0
+            }
+        ], 
+        "recommendation": "Situation normale"
+    }, 
+    "table_name": "splio.active", 
+    "target_date": "20260120"
+}

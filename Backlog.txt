@@ -3,7 +3,7 @@ Lancer analyses sans IA : OK
 Creation rapport sans I : OK
 Afficher les erreurs dans le rapport : OK
 Possibilité de lancer rattrapage sans IA (avec jar)
-Changer page rapport - mettre plus joli
+Changer page rapport - mettre plus joli : OK
 
 
 Changer le format et 
