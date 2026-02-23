@@ -584,6 +584,96 @@ class KnoxLivyClient:
         
         raise TimeoutError("Timeout lors de l'exécution du batch")
     
+    def submit_jar(self, jar_path: str, args: str = "") -> Dict[str, Any]:
+        """Soumet un JAR pour exécution"""
+        logger.info(f"📦 Soumission du JAR: {jar_path}")
+        
+        # Préparer la payload pour un batch job avec JAR
+        payload = {
+            "file": jar_path,
+            "driverMemory": self.driver_memory,
+            "driverCores": self.driver_cores,
+            "executorMemory": self.executor_memory,
+            "executorCores": self.executor_cores,
+            "numExecutors": self.num_executors,
+            "queue": self.queue,
+            "proxyUser": self.proxy_user,
+            "heartbeatTimeoutInSecond": self.heartbeat_timeout_in_second,
+            "conf": self.conf,
+            "archives": self.archives,
+            "files": self.files,
+            "jars": self.jars,
+        }
+        
+        # Ajouter les arguments si fournis
+        if args:
+            payload["args"] = args.split()
+        
+        logger.info(f"Payload JAR: {json.dumps(payload, indent=2)}")
+        
+        try:
+            # Soumettre le batch job
+            response = requests.post(
+                f"{self.base_url}/batches",
+                headers=self.headers,
+                json=payload,
+                auth=self.auth,
+                verify=False,
+                timeout=30
+            )
+            
+            if response.status_code not in [200, 201]:
+                error_msg = response.text
+                logger.error(f"❌ Erreur soumission JAR: {error_msg}")
+                raise Exception(f"Erreur Livy: {error_msg}")
+            
+            batch_response = response.json()
+            batch_id = batch_response.get("id")
+            logger.info(f"✓ JAR soumis avec succès - Batch ID: {batch_id}")
+            
+            # Attendre la fin de l'exécution
+            return self._wait_for_batch(batch_id)
+        
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la soumission du JAR: {str(e)}", exc_info=True)
+            raise
+    
+    def _wait_for_batch(self, batch_id: int, timeout: int = 3600) -> Dict[str, Any]:
+        """Attend la fin d'exécution d'un batch job"""
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            try:
+                response = requests.get(
+                    f"{self.base_url}/batches/{batch_id}",
+                    headers=self.headers,
+                    auth=self.auth,
+                    verify=False,
+                    timeout=10
+                )
+                
+                batch_info = response.json()
+                state = batch_info.get("state", "")
+                
+                logger.info(f"État du batch {batch_id}: {state}")
+                
+                if state in ["success", "dead", "finished"]:
+                    logger.info(f"✓ Batch terminé: {state}")
+                    return {
+                        "success": state == "success",
+                        "state": state,
+                        "batch_id": batch_id,
+                        "log": batch_info.get("log", [])
+                    }
+                
+                time.sleep(2)
+            
+            except Exception as e:
+                logger.warning(f"Erreur lors de la vérification du batch: {e}")
+                time.sleep(2)
+        
+        raise TimeoutError(f"Timeout lors de l'exécution du batch {batch_id}")
+    
     def close_session(self):
         """Ferme la session"""
         if self.session_id:

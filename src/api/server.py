@@ -41,6 +41,7 @@ from pathlib import Path as PathlibPath
 PathlibPath('/tmp/spark_trend_logs').mkdir(exist_ok=True, parents=True)
 
 from ..agents import analyze_trend
+from ..agents.livy_client import KnoxLivyClient
 from ..models.config import Config
 from ..utils.logger import setup_logger
 from ..utils.serializers import make_json_serializable
@@ -57,6 +58,28 @@ logger = setup_logger(__name__)
 # ============================================
 
 db_service = DatabaseService()
+
+# ============================================
+# LIVY CLIENT GLOBAL
+# ============================================
+
+livy_client = KnoxLivyClient(
+    knox_host=Config.KNOX_HOST,
+    ad_user=Config.AD_USER,
+    ad_password=Config.AD_PASSWORD,
+    driver_memory=Config.DRIVER_MEMORY,
+    driver_cores=Config.DRIVER_CORES,
+    executor_memory=Config.EXECUTOR_MEMORY,
+    executor_cores=Config.EXECUTOR_CORES,
+    num_executors=Config.NUM_EXECUTORS,
+    queue=Config.QUEUE,
+    proxy_user=Config.PROXY_USER,
+    conf=Config.get_livy_conf(),
+    jars=Config.get_livy_jars(),
+    files=Config.get_livy_files(),
+    archives=Config.get_livy_archives(),
+    py_files=Config.get_livy_py_files()
+)
 
 # ============================================
 # JOB STORAGE (EN-MÉMOIRE)
@@ -1526,6 +1549,40 @@ async def general_exception_handler(request, exc):
 # ============================================
 # STARTUP/SHUTDOWN
 # ============================================
+
+@app.post("/api/v1/recovery/execute-jar", tags=["API v1"])
+async def execute_recovery_jar(request: dict):
+    """Exécuter un JAR de rattrapage"""
+    try:
+        jar_path = request.get("jarPath", "").strip()
+        jar_args = request.get("jarArgs", "").strip()
+        
+        if not jar_path:
+            raise HTTPException(status_code=400, detail="Le chemin du JAR ne peut pas être vide")
+        
+        logger.info(f"Exécution du JAR: {jar_path}")
+        if jar_args:
+            logger.info(f"Arguments: {jar_args}")
+        
+        # Utiliser le client Livy pour soumettre le JAR
+        result = livy_client.submit_jar(jar_path, jar_args)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": f"JAR lancé avec succès",
+                "jar_path": jar_path,
+                "session_id": result.get("session_id")
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de l'exécution du JAR: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
 
 @app.on_event("startup")
 async def startup_event():

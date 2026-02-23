@@ -29,6 +29,46 @@ class Config:
     EXECUTOR_CORES = int(os.getenv("EXECUTOR_CORES", "2"))
     NUM_EXECUTORS = int(os.getenv("NUM_EXECUTORS", "4"))
     QUEUE = os.getenv("QUEUE", "root.datalake")
+    PROXY_USER = os.getenv("PROXY_USER", "sddesigner")
+    
+    # ========================================
+    # Livy Advanced Configuration
+    # ========================================
+    @staticmethod
+    def get_livy_jars() -> list:
+        """Parse LIVY_JARS from .env"""
+        jars_str = os.getenv("LIVY_JARS", "").strip()
+        return [j.strip() for j in jars_str.split(",") if j.strip()]
+    
+    @staticmethod
+    def get_livy_files() -> list:
+        """Parse LIVY_FILES from .env"""
+        files_str = os.getenv("LIVY_FILES", "").strip()
+        return [f.strip() for f in files_str.split(",") if f.strip()]
+    
+    @staticmethod
+    def get_livy_archives() -> list:
+        """Parse LIVY_ARCHIVES from .env"""
+        archives_str = os.getenv("LIVY_ARCHIVES", "").strip()
+        return [a.strip() for a in archives_str.split(",") if a.strip()]
+    
+    @staticmethod
+    def get_livy_py_files() -> list:
+        """Parse LIVY_PY_FILES from .env"""
+        py_files_str = os.getenv("LIVY_PY_FILES", "").strip()
+        return [p.strip() for p in py_files_str.split(",") if p.strip()]
+    
+    @staticmethod
+    def get_livy_conf() -> dict:
+        """Parse LIVY_CONF from .env (JSON format)"""
+        import json
+        conf_str = os.getenv("LIVY_CONF", "{}").strip()
+        try:
+            return json.loads(conf_str) if conf_str and conf_str != "{}" else {}
+        except json.JSONDecodeError:
+            import logging
+            logging.warning(f"Invalid JSON in LIVY_CONF: {conf_str}")
+            return {}
     
     # ========================================
     # Recovery JAR Configuration
