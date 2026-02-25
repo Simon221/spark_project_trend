@@ -1552,35 +1552,71 @@ async def general_exception_handler(request, exc):
 
 @app.post("/api/v1/recovery/execute-jar", tags=["API v1"])
 async def execute_recovery_jar(request: dict):
-    """Exécuter un JAR de rattrapage"""
+    """Exécuter un JAR de rattrapage
+    
+    Request:
+    {
+        "jarArgs": "splio splio_active 2026-02-18 normal"  # Arguments du JAR
+    }
+    """
     try:
-        jar_path = request.get("jarPath", "").strip()
         jar_args = request.get("jarArgs", "").strip()
+        jar_path = request.get("jarPath", "").strip() or Config.RECOVERY_JAR_PATH
+        
+        if not jar_args:
+            raise HTTPException(status_code=400, detail="jarArgs est obligatoire (ex: 'splio splio_active 2026-02-18 normal')")
         
         if not jar_path:
             raise HTTPException(status_code=400, detail="Le chemin du JAR ne peut pas être vide")
         
-        logger.info(f"Exécution du JAR: {jar_path}")
-        if jar_args:
-            logger.info(f"Arguments: {jar_args}")
+        logger.info(f"📦 Exécution du rattrapage JAR")
+        logger.info(f"  JAR: {jar_path}")
+        logger.info(f"  Arguments: {jar_args}")
         
         # Utiliser le client Livy pour soumettre le JAR
-        result = livy_client.submit_jar(jar_path, jar_args)
+        result = livy_client.submit_jar(jar_path, jar_args, Config.RECOVERY_JAR_CLASS)
+        
+        # Vérifier si le batch a échoué
+        if not result.get("success"):
+            error_state = result.get("state", "unknown")
+            error_logs = result.get("log", [])
+            error_msg = f"Exécution du batch échouée (état: {error_state})"
+            
+            if error_logs:
+                # Afficher les derniers logs d'erreur
+                error_details = "\n".join(error_logs[-10:]) if isinstance(error_logs, list) else str(error_logs)
+                logger.error(f"❌ Détails de l'erreur:\n{error_details}")
+                error_msg = f"{error_msg}\n\nDétails: {error_details[:500]}"
+            
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "message": error_msg,
+                    "jar_path": jar_path,
+                    "jar_args": jar_args,
+                    "batch_id": result.get("batch_id"),
+                    "state": error_state,
+                    "logs": error_logs[-10:] if isinstance(error_logs, list) else []
+                }
+            )
         
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
-                "message": f"JAR lancé avec succès",
+                "message": f"JAR lancé et exécuté avec succès",
                 "jar_path": jar_path,
-                "session_id": result.get("session_id")
+                "jar_args": jar_args,
+                "batch_id": result.get("batch_id"),
+                "state": result.get("state", "success")
             }
         )
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Erreur lors de l'exécution du JAR: {str(e)}", exc_info=True)
+        logger.error(f"❌ Erreur lors de l'exécution du JAR: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 

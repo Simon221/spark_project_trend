@@ -13,4 +13,7 @@ docker run -d \
   -p 6379:6379 \
   redis:7
 
-# exemple jar : hdfs://bigdata/dlk/osn/workflow/Projets/SPLIO_DMGP/jars/splio_project_2.12-0.1.0-SNAPSHOT.jar
+# conf spark
+  scala> spark.conf.getAll.toSeq.sortBy(_._1).foreach { case (k, v) =>
+     |   println(s"$k = $v")
+     | }

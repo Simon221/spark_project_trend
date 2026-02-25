@@ -546,51 +546,41 @@ class KnoxLivyClient:
         
         return result
     
-    def _wait_for_batch(self, batch_id: int, timeout: int = 600) -> Dict:
-        """Attend la fin d'un batch job"""
-        logger.info("Attente du batch...")
+    def submit_jar(self, jar_path: str, args: str = "", class_name: str = "") -> Dict[str, Any]:
+        """Soumet un JAR pour exécution sur le cluster Spark via Livy
         
-        start_time = time.time()
-        wait_interval = 10
-        
-        while time.time() - start_time < timeout:
-            response = requests.get(
-                f"{self.base_url}/batches/{batch_id}",
-                headers=self.headers,
-                auth=self.auth,
-                verify=False
-            )
+        Args:
+            jar_path: Chemin HDFS du JAR (ex: hdfs://path/to/app.jar)
+            args: Arguments à passer au JAR, séparés par des espaces
+            class_name: Classe Java à exécuter (ex: com.example.Main). Si vide, utilise RECOVERY_JAR_CLASS
             
-            data = response.json()
-            state = data.get("state", "unknown")
-            
-            logger.info(f"  État batch: {state}")
-            
-            if state == "success":
-                logger.info("✓ Batch terminé avec succès!")
-                return {
-                    "success": True,
-                    "batch_id": batch_id,
-                    "data": data
-                }
-            elif state in ["error", "dead", "killed"]:
-                return {
-                    "success": False,
-                    "error": f"Batch échoué: {state}",
-                    "data": data
-                }
-            
-            time.sleep(wait_interval)
-        
-        raise TimeoutError("Timeout lors de l'exécution du batch")
-    
-    def submit_jar(self, jar_path: str, args: str = "") -> Dict[str, Any]:
-        """Soumet un JAR pour exécution"""
+        Returns:
+            Résultat de l'exécution du batch
+        """
         logger.info(f"📦 Soumission du JAR: {jar_path}")
+        
+        # Utiliser RECOVERY_JAR_CLASS si class_name n'est pas fourni
+        if not class_name:
+            try:
+                # Essayer les deux styles d'import
+                try:
+                    from ..models.config import Config
+                except (ModuleNotFoundError, ValueError):
+                    from src.models.config import Config
+                
+                class_name = Config.RECOVERY_JAR_CLASS
+                if not class_name:
+                    raise ValueError("class_name est requis et non défini dans la configuration (RECOVERY_JAR_CLASS)")
+            except Exception as e:
+                logger.warning(f"⚠️ Impossible de charger Config: {e}. className obligatoire en paramètre.")
+                raise ValueError("className est obligatoire quand RECOVERY_JAR_CLASS n'est pas défini")
+        
+        logger.info(f"📦 Classe à exécuter: {class_name}")
         
         # Préparer la payload pour un batch job avec JAR
         payload = {
             "file": jar_path,
+            "className": class_name,
             "driverMemory": self.driver_memory,
             "driverCores": self.driver_cores,
             "executorMemory": self.executor_memory,
@@ -598,12 +588,15 @@ class KnoxLivyClient:
             "numExecutors": self.num_executors,
             "queue": self.queue,
             "proxyUser": self.proxy_user,
-            "heartbeatTimeoutInSecond": self.heartbeat_timeout_in_second,
             "conf": self.conf,
             "archives": self.archives,
             "files": self.files,
             "jars": self.jars,
         }
+        # NOTE: heartbeatTimeoutInSecond is NOT supported by Livy batch endpoint
+        # It's only valid for session creation, not batch jobs. The Livy batch API only accepts:
+        # executorCores, className, conf, driverMemory, name, driverCores, pyFiles, archives,
+        # executorMemory, files, jars, proxyUser, numExecutors, file, args, queue
         
         # Ajouter les arguments si fournis
         if args:
@@ -659,11 +652,34 @@ class KnoxLivyClient:
                 
                 if state in ["success", "dead", "finished"]:
                     logger.info(f"✓ Batch terminé: {state}")
+                    
+                    # Récupérer les logs complètes si le batch a échoué
+                    batch_logs = []
+                    if state != "success":
+                        try:
+                            log_response = requests.get(
+                                f"{self.base_url}/batches/{batch_id}/log",
+                                headers=self.headers,
+                                auth=self.auth,
+                                verify=False,
+                                timeout=10
+                            )
+                            if log_response.status_code == 200:
+                                log_data = log_response.json()
+                                batch_logs = log_data.get("log", [])
+                                
+                                if batch_logs:
+                                    logger.error(f"❌ Logs du batch échoué {batch_id}:")
+                                    for log_line in batch_logs[-20:]:  # Dernières 20 lignes
+                                        logger.error(f"  {log_line}")
+                        except Exception as e:
+                            logger.warning(f"Impossible de récupérer les logs du batch: {e}")
+                    
                     return {
                         "success": state == "success",
                         "state": state,
                         "batch_id": batch_id,
-                        "log": batch_info.get("log", [])
+                        "log": batch_logs if batch_logs else batch_info.get("log", [])
                     }
                 
                 time.sleep(2)
